@@ -9,6 +9,7 @@ from module_fence.logic_handler import LogicHandler
 import time
 from system.utils import get_polygon_points
 import cv2
+from system.socket.sokect_server import server
 def get_camera_ids():
     server_name = get_computer_name()
     root_url = f'http://192.168.1.35:8080/camera/{server_name}'
@@ -53,6 +54,9 @@ def main():
     frames_dict_1 = frame_reader.get_last_frames()
     frames_dict_2 = frame_reader.get_last_frames()
     start_time = time.time()
+
+
+    print(server.connected_clients)
 
     while True:
         try:

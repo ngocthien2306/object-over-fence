@@ -109,8 +109,8 @@ class EventHandler(EventHandlerBase):
 
         # self._post_event(timestamp, event_image_info.image_log_uri)
         
-        save_image(event_image_info.image_log_path, frame_log)
-        save_image(event_image_info.image_org_path, frame_org)
+        # save_image(event_image_info.image_log_path, frame_log)
+        # save_image(event_image_info.image_org_path, frame_org)
 
     def _run(self):
         while True:
