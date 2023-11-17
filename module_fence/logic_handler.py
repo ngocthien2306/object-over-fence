@@ -32,20 +32,28 @@ class LogicHandler:
         self._end_time = time.time()
         self._count_frame = 0
 
-        self._is_start_record = False
+        self.is_start_record = False
         self._video_frames = {
             'org': [],
             'frame_plot': []
         }
         self._current_fps = 0
 
-    def fps(self, f=1.0):
+    def fps(self, f=1.0, show=False):
         self._end_time = time.time()
         if self._end_time - self._start_time >= f:
-            print(f"{self._camera_id}: {self._count_frame} fps")
+            if show:
+                print(f"{self._camera_id}: {self._count_frame} fps")
             self._start_time = self._end_time
             self._current_fps = self._count_frame
             self._count_frame = 0
+            
+    def show_state_record(self):
+        self._end_time = time.time()
+        if self._end_time - self._start_time >= 1:
+            self._start_time = self._end_time
+            
+        print(f"{self._camera_id}: {self.is_start_record}")
 
     def _process_frame(self, frame1, frame2):
         inside_yn = False
@@ -84,7 +92,6 @@ class LogicHandler:
 
             if check_bbox_in_poly((x1, y1, x2, y2), self._points['POINTS_1']):
                 inside_yn = True
-                self._is_start_record = True
 
             plot_detection_result((x1, y1, x2, y2),
                                   frame_plot, self.colors[str(100)],
@@ -102,20 +109,7 @@ class LogicHandler:
 
     def update(self, frame1, frame2):
         is_wrong, frame_plot = self._process_frame(frame1, frame2)
-        videos = []
-        if self._is_start_record:
-            # print(len(self._video_frames['org']))
-            if len(self._video_frames['org']) <= self._current_fps * 10:
-                self._video_frames['org'].append(frame_plot)
-                self._video_frames['frame_plot'].append(frame_plot)
-            else:
-                videos = self._video_frames
-                self._video_frames = {
-                    'org': [],
-                    'frame_plot': []
-                }
-                self._is_start_record = False
-
+        
         if is_wrong:
             current_timestamp = int(time.time())
             plot_text(frame_plot, (50, 50), "DANGER: OBJECT IN FENCE", (0, 0, 255), line_width=3)
@@ -124,9 +118,11 @@ class LogicHandler:
             if self._last_event_timestamp != current_timestamp and self._last_handle_wrong:
                 self._last_event_timestamp = current_timestamp
                 self._plc_controller.turn_on()
+                
 
-                if len(videos) > 0:
-                    self._event_handler.update(videos['org'], videos['frame_plot'])
+                if self._camera_id == 'camera-2':
+                    self._event_handler.update(frame2, frame_plot)
+                    
                 self._last_handle_wrong = False
 
             self._number_true_frame = 0
@@ -144,6 +140,24 @@ class LogicHandler:
 
                 frame_plot = draw_area(self._points['POINTS_2'], frame_plot)
 
+        
+        videos = []
+        if self.is_start_record:
+            print(f'{self._camera_id}: ', len(self._video_frames['org']))
+            if len(self._video_frames['org']) <= 40:
+                self._video_frames['org'].append(frame2)
+                self._video_frames['frame_plot'].append(frame_plot)
+            else:
+                videos = self._video_frames
+                self._video_frames = {
+                    'org': [],
+                    'frame_plot': []
+                }
+                self.is_start_record = False
+                 
+        if len(videos) > 0:
+            print(f'{self._camera_id}: Done frame')
+            self._event_handler.update_video(videos['org'], videos['frame_plot'])
 
         self._event_handler.post_frame(frame_plot)
 

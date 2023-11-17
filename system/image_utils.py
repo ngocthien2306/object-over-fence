@@ -16,7 +16,24 @@ def image_resize(frame, output_size=None):
 
 def save_image(path, frame):
     cv2.imwrite(path, frame)
+    
+def save_video(path, frames, fps=30, size=(1920, 1080)):
+    """
+    Save a video from a list of frames.
 
+    Parameters:
+    - path: The path to save the video file.
+    - frames: A list of frames (each frame is a NumPy array).
+    - fps: Frames per second for the video (default is 30).
+    - size: The size of the frames (default is 1920x1080).
+    """
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(path, fourcc, fps, size)
+    for frame in frames:
+        out.write(frame)
+
+    out.release()
+    
 def image_to_bytes(frame):
     _, frame = cv2.imencode(
         ".jpg",
