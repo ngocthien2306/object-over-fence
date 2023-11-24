@@ -6,7 +6,7 @@ from system.event_handler import EventHandler, EventHandlerBase
 from system.plc_controller import PLCController, PLCControllerBase
 import cv2
 from PIL import Image, ImageChops
-
+from ultralytics import YOLO
 
 class LogicHandler:
     def __init__(self, config: LogicConfig, points, camera_id) -> None:
@@ -20,6 +20,8 @@ class LogicHandler:
         else:
             self._plc_controller = PLCControllerBase(self._config.plc_controller_config)
 
+        self._model = YOLO("models/yolov8m.pt", task='detect')
+        
         self._number_true_frame = 7
         self._last_event_timestamp = 0
         self._last_handle_wrong = True
@@ -31,7 +33,7 @@ class LogicHandler:
         self._start_time = time.time()
         self._end_time = time.time()
         self._count_frame = 0
-
+        self._is_clicked_alarm = False
         self.is_start_record = False
         self._video_frames = {
             'org': [],
@@ -62,44 +64,61 @@ class LogicHandler:
         frame2 = cv2.resize(frame2, (1280, 720))
         frame_plot = frame2.copy()
 
-        frame1_pil = Image.fromarray(cv2.cvtColor(frame1, cv2.COLOR_BGR2RGB))
-        frame2_pil = Image.fromarray(cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB))
-        diff = ImageChops.difference(frame1_pil, frame2_pil)
+        # frame1 = remove_green(frame1)
+        # frame2 = remove_green(frame2)
+        
+        predicts = self._model(frame_plot, verbose=False, classes=0, conf=0.4)
+        
+        bboxes = predicts[0].boxes.xyxy.cpu().int().tolist()
+        bboxes = [[[box[0], box[1]], [box[2], box[3]]] for box in bboxes]
+        
+        frame_plot = predicts[0].plot()
+        # cv2.imshow("frame_plot", frame_plot)
+        
+        diff = cv2.absdiff(frame1, frame2)
 
-        diff = np.array(diff)
         diff_gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
-        blur = cv2.medianBlur(diff_gray, 15)
+        blur = cv2.medianBlur(diff_gray, 21)
         _, thresh = cv2.threshold(blur, 25, 255, cv2.THRESH_BINARY)
 
         dilated = cv2.dilate(thresh, None, iterations=3)
         contours, _ = cv2.findContours(
             dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-        bounding_boxs = []
+        bounding_boxs = bboxes
         for contour in contours:
             (x, y, w, h) = cv2.boundingRect(contour)
-            if cv2.contourArea(contour) < 50:
+            if cv2.contourArea(contour) < 1200:
                 continue
 
             bounding_boxs.append([[int(x), int(y)], [int(x + w), int(y + h)]])
 
-        bounding_boxs = merge_bbox(bounding_boxs, merge_margin=30)
+        bounding_boxs = merge_bbox(bounding_boxs, merge_margin=20)
 
         for i, box in enumerate(bounding_boxs):
             p1, p2 = box
             x1, y1 = p1
             x2, y2 = p2
 
-            if check_bbox_in_poly((x1, y1, x2, y2), self._points['POINTS_1']):
+            if check_bbox_in_poly((x1, y1, x2, y2), self._points['POINTS_2']):
                 inside_yn = True
+                self.is_start_record = True
+                # plot_detection_result((x1, y1, x2, y2),
+                #     frame_plot, (0, 0, 230),
+                #     'undefined object', None)
+            
+            # else:
+            #     plot_detection_result((x1, y1, x2, y2),
+            #         frame_plot, self.colors[str(100)],
+            #         'undefined object', None)
 
-            plot_detection_result((x1, y1, x2, y2),
-                                  frame_plot, self.colors[str(100)],
-                                  'undefined object', None)
-
-        if self._camera_id == 'camera-2':
+        if self._camera_id == 'camera-1':
             dilated = cv2.resize(dilated, (720, 508))
+            frame1 = cv2.resize(frame1, (720, 508))
+            frame2 = cv2.resize(frame2, (720, 508))
             cv2.imshow("dilated", dilated)
+            cv2.imshow("frame1", frame1)
+            cv2.imshow("frame2", frame2)
 
         key = cv2.waitKey(1)
         if key == ord('q'):
@@ -119,9 +138,7 @@ class LogicHandler:
                 self._last_event_timestamp = current_timestamp
                 self._plc_controller.turn_on()
                 
-
-                if self._camera_id == 'camera-2':
-                    self._event_handler.update(frame2, frame_plot)
+                self._event_handler.update(frame2, frame_plot)
                     
                 self._last_handle_wrong = False
 
@@ -140,11 +157,12 @@ class LogicHandler:
 
                 frame_plot = draw_area(self._points['POINTS_2'], frame_plot)
 
-        
+         
         videos = []
-        if self.is_start_record:
-            print(f'{self._camera_id}: ', len(self._video_frames['org']))
-            if len(self._video_frames['org']) <= 40:
+        if self.is_start_record or self._is_clicked_alarm:
+            print(f'{self._camera_id} - frame number ', len(self._video_frames['org']))
+            self._event_handler.fps = self._current_fps
+            if len(self._video_frames['org']) <= (int(self._current_fps) * 10):
                 self._video_frames['org'].append(frame2)
                 self._video_frames['frame_plot'].append(frame_plot)
             else:
@@ -155,13 +173,17 @@ class LogicHandler:
                 }
                 self.is_start_record = False
                  
-        if len(videos) > 0:
+        if len(videos) > 0 and self._is_clicked_alarm:
             print(f'{self._camera_id}: Done frame')
             self._event_handler.update_video(videos['org'], videos['frame_plot'])
-
+            self._is_clicked_alarm = False
         self._event_handler.post_frame(frame_plot)
 
         return is_wrong, frame_plot
 
     def count_frame(self):
         self._count_frame += 1
+        
+    
+
+    

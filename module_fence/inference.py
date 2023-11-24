@@ -12,9 +12,11 @@ import cv2
 from system.socket import sokect_server
 import threading
 import eventlet
+from system.utils import SERVER_BE_IP
+
 def get_camera_ids():
     server_name = get_computer_name()
-    root_url = f'http://26.30.0.242:8080/camera/{server_name}'
+    root_url = f'http://{SERVER_BE_IP}:8080/camera/{server_name}'
     res = requests.get(root_url)
     content = res.json()
     return [camera['camera_id'] for camera in content['data']['cameras']]
@@ -32,7 +34,7 @@ def main():
         print(f"http://{get_ipv4_address()}:8005/stream-manage/output/{module_id}-{camera_id}")
         event_handler_config = EventHandlerConfig(
             post_frame_url=f"http://{get_ipv4_address()}:8005/stream-manage/output/{module_id}-{camera_id}",
-            post_event_url="http://26.30.0.242:8080/event",
+            post_event_url=f"http://{SERVER_BE_IP}:8080/event",
             camera_id=camera_id,
             module_id=module_id,
             msgType=2,
@@ -77,12 +79,12 @@ def main():
 
                 logic_handlers[key1].update(value1, value2)
                 logic_handlers[key1].count_frame()
-                logic_handlers[key1].show_state_record()
-                logic_handlers[key1].fps()
+                # logic_handlers[key1].show_state_record()
+                logic_handlers[key1].fps(show=True)
 
             frames_dict_2 = frame_reader.get_last_frames()
             end_time = time.time()
-            n_time = 1
+            n_time = 0.5
             if end_time - start_time > n_time:
                 start_time = end_time
                 frames_dict_1 = frames_dict_2

@@ -4,13 +4,31 @@ import cv2
 from matplotlib import path
 import socket
 
+SERVER_BE_IP = '26.30.0.242'
 TRANSPARENT_SCORE = 0.3
 LINE_AREA_COLOR = (94, 73, 52)
+
+def remove_green(image):
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    lower_green = (36, 25, 25)
+    upper_green = (86, 255, 255)
+    mask = cv2.inRange(hsv, lower_green, upper_green)
+    result = cv2.bitwise_and(image, image, mask = cv2.bitwise_not(mask))
+    return result
+
+def crop_image_by_polygon(image, polygon_points):
+    mask = np.zeros_like(image)
+    pts = np.array(polygon_points, dtype=np.int32)
+    cv2.fillPoly(mask, [pts], (255, 255, 255))
+    result = cv2.bitwise_and(image, mask)
+    x, y, w, h = cv2.boundingRect(pts)
+    cropped_image = result[y:y+h, x:x+w]
+    return cropped_image
 
 def get_ipv4_address():
     hostname = socket.gethostname()
     ipv4_address = socket.gethostbyname(hostname)
-    return ipv4_address
+    return '26.30.0.242'
 
 def get_computer_name():
     computer_name = socket.gethostname()
@@ -21,7 +39,6 @@ def get_color_dict():
     with open('system/assets/color_dict.json', 'r') as json_file:
         loaded_color_dict = json.load(json_file)
     return loaded_color_dict
-
 
 # returns true if the two boxes overlap
 def overlap(source, target):
@@ -40,7 +57,6 @@ def overlap(source, target):
         return False
     return True
 
-
 # returns all overlapping boxes
 def getAllOverlaps(boxes, bounds, index):
     """
@@ -52,7 +68,6 @@ def getAllOverlaps(boxes, bounds, index):
             if overlap(bounds, boxes[a]):
                 overlaps.append(a)
     return overlaps
-
 
 def merge_bbox(boxes, merge_margin=5):
     # this is gonna take a long time
@@ -272,6 +287,14 @@ def get_polygon_points():
         "camera-4": {
             'POINTS_1': [[3, 484], [849, 73], [880, 202], [114, 718], [5, 490]],
             'POINTS_2': [[866, 4], [888, 206], [153, 717], [5, 716], [5, 6], [864, 5]]
+        },
+        "camera-5": {
+            'POINTS_1': [[3, 484], [849, 73], [880, 202], [114, 718], [5, 490]],
+            'POINTS_2': [[866, 4], [888, 206], [153, 717], [5, 716], [5, 6], [864, 5]]
+        },
+        "camera-6": {
+            'POINTS_1': [[610, 368], [550, 380], [550, 417], [534, 422], [548, 557], [553, 570], [562, 626], [600, 698], [1090, 698], [1159, 640], [948, 474], [941, 495], [882, 518], [887, 541], [880, 540], [879, 553], [879, 557], [684, 552], [664, 544], [653, 532], [652, 510], [654, 498], [668, 487], [702, 483], [719, 484], [612, 366]], 
+            'POINTS_2': [[729, 486], [687, 487], [671, 492], [659, 499], [654, 506], [654, 527], [668, 544], [695, 549], [758, 552], [833, 553], [878, 555], [879, 541], [886, 541], [882, 519], [880, 500], [887, 502], [884, 475], [884, 440], [884, 425], [868, 416], [868, 394], [847, 378], [850, 360], [830, 346], [831, 329], [812, 316], [815, 299], [798, 288], [796, 267], [780, 260], [780, 240], [764, 232], [762, 211], [708, 190], [704, 172], [696, 170], [695, 15], [576, 14], [524, 134], [525, 155], [555, 150], [558, 168], [588, 166], [589, 186], [620, 182], [622, 199], [648, 194], [648, 262], [660, 269], [660, 285], [673, 298], [674, 316], [690, 332], [688, 348], [707, 364], [703, 386], [723, 400], [720, 427], [725, 451], [732, 466], [728, 486]]
         }
     }
     return points_dict

@@ -16,7 +16,7 @@ class SocketIOServer:
 
     def handle_message(self, sid, data):
         print(f"Message from {sid}: {data}")
-        self.logic_handlers[data['camera_id']].is_start_record = True
+        self.logic_handlers[data['camera_id']]._is_clicked_alarm = True
         self.sio.send(sid, "Server received your message!")
 
     def handle_connect(self, sid, environ):

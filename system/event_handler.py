@@ -56,7 +56,7 @@ class EventHandler(EventHandlerBase):
         self._config = config
         self._queue = []
         self._queue_video = []
-
+        self.fps = 0
         self._t = threading.Thread(target=self._run)
         self._t.daemon = True
         self._t.start()
@@ -132,7 +132,7 @@ class EventHandler(EventHandlerBase):
             "timestamp": int(timestamp),
             "video_uri": video_uri,
             "msgType": self._config.msgType,
-            'dns': f'http://{get_computer_name()}:8080'
+            'dns': f'http://{get_ipv4_address()}:8005'
         }
         
         requests.post(self._config.post_event_url + '/video', json=event_message, timeout=2)
@@ -163,6 +163,8 @@ class EventHandler(EventHandlerBase):
 
         if not self._config.post_event_url:
             return 
+        
+        print('error')
 
         self._post_event(timestamp, event_image_info.image_log_uri)
         
@@ -184,20 +186,20 @@ class EventHandler(EventHandlerBase):
         save_video(
             path=event_video_info.video_log_path, 
             frames=frames_log, 
-            fps=4, 
+            fps=self.fps, 
             size=self._config.frame_log_size)
         
         save_video(
             path=event_video_info.video_org_path, 
             frames=frames_org, 
-            fps=4, 
+            fps=self.fps, 
             size=self._config.frame_org_size)
         
     def _run(self):
         while True:
             if len(self._queue) > 0:
                 frame_org, frame_log = self._queue.pop(0)
-                
+                self._process(frame_org, frame_log)
             if len(self._queue_video) > 0:
                 frames_org, frames_log = self._queue_video.pop(0)
                 self._process_video(frames_org, frames_log)
